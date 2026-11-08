@@ -1835,35 +1835,6 @@ export default async function DashboardPage() {
             )}
             {isTutorialSec && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <p className="text-sm text-gray-500">Cards due today</p>
-                <p className="text-2xl font-bold mt-1 text-amber-800">
-                  {renewalsDueToday.length}
-                </p>
-                <Link
-                  href="/students"
-                  className="text-sm text-brand-green font-medium mt-1 inline-block"
-                >
-                  Renewals →
-                </Link>
-              </div>
-            )}
-            {isTutorialSec && (
-              <div className="bg-white rounded-xl border border-red-200 p-5 shadow-sm">
-                <p className="text-sm text-gray-500">Expired cards (3 days)</p>
-                <p className="text-2xl font-bold mt-1 text-red-700">
-                  {expiredCardsRecent.length}
-                </p>
-                <p className="text-xs text-red-600 mt-1">Marked Expired card</p>
-                <Link
-                  href="/students"
-                  className="text-sm text-brand-green font-medium mt-1 inline-block"
-                >
-                  View expired →
-                </Link>
-              </div>
-            )}
-            {isTutorialSec && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <p className="text-sm text-gray-500">Teacher pay today</p>
                 <p className="text-2xl font-bold mt-1 text-gray-900">
                   {formatCurrency(teacherPayTodayAmt)}
@@ -1918,9 +1889,6 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
-</div>
-            </div>
-          )}
 
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden mb-8">
             <div className="px-6 py-4 border-b">
