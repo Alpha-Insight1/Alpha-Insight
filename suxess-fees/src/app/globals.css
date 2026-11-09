@@ -4,17 +4,31 @@
 
 :root {
   --ai-primary: #4f46e5;
-  --ai-page: #f7f8fc;
+  --ai-page: #eef4fb;
+  --ai-page-soft: #f5f8fc;
   --ai-ink: #1e293b;
   --ai-muted: #64748b;
   --ai-card: #ffffff;
   --ai-border: #e2e8f0;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   color: var(--ai-ink);
-  background-color: var(--ai-page);
+  background: linear-gradient(180deg, #e8f1fb 0%, #f3f6fb 45%, #eef2f8 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+html.dark body {
+  background: linear-gradient(180deg, #0b1220 0%, #0f172a 50%, #111827 100%);
+  background-attachment: fixed;
+  color: #e2e8f0;
 }
 
 .safe-bottom {
@@ -27,23 +41,24 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-html {
-  overflow-x: hidden;
-}
-
 @layer base {
-  input, select, textarea, button {
+  input,
+  select,
+  textarea,
+  button {
     font-size: 16px;
   }
 }
 
 @media (min-width: 1024px) {
-  input, select, textarea, button {
+  input,
+  select,
+  textarea,
+  button {
     font-size: inherit;
   }
 }
 
-/* High-contrast form fields */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
@@ -77,10 +92,19 @@ textarea::placeholder {
   -webkit-text-fill-color: #94a3b8 !important;
 }
 
-.dark .bg-white { background-color: #0f172a; }
-.dark .text-gray-900 { color: #f8fafc; }
-.dark .border-gray-200 { border-color: #334155; }
-.dark .bg-gray-50 { background-color: #1e293b; }
+.dark .bg-white {
+  background-color: #1e293b;
+}
+.dark .text-gray-900 {
+  color: #f8fafc;
+}
+.dark .border-gray-200,
+.dark .border-gray-100 {
+  border-color: #334155;
+}
+.dark .bg-gray-50 {
+  background-color: #0f172a;
+}
 
 body.privacy-mode [data-privacy="money"],
 body.privacy-mode .privacy-amount {
@@ -104,10 +128,16 @@ textarea:focus {
   border-color: #818cf8 !important;
 }
 
-/* Soft card elevation utility */
-.ai-card {
-  background: white;
-  border: 1px solid #eef2f7;
-  border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+/* Logo on light panels */
+.ai-logo-wrap {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 0.35rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.dark .ai-logo-wrap {
+  background: #ffffff;
+  border-color: #cbd5e1;
 }

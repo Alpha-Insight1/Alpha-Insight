@@ -23,7 +23,7 @@ export default async function DashboardLayout({
     profile?.campuses?.short_name || profile?.campuses?.name || "School";
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] dark:bg-gray-950">
+    <div className="min-h-screen bg-transparent">
       <Sidebar
         roleLabel={roleLabel}
         campusLabel={campusLabel}

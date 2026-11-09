@@ -105,7 +105,7 @@ export function Sidebar({
             alt="Alpha Insight"
             width={40}
             height={40}
-            className="rounded-xl object-contain shadow-sm"
+            className="rounded-xl object-contain shadow-sm bg-white p-0.5"
             priority
           />
           <div className="min-w-0">
@@ -174,7 +174,7 @@ export function Sidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white border-b border-slate-200 flex items-center px-3 gap-3 shadow-sm">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center px-3 gap-3 shadow-sm">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -188,7 +188,7 @@ export function Sidebar({
           alt="Alpha Insight"
           width={28}
           height={28}
-          className="rounded-lg object-contain"
+          className="rounded-lg object-contain bg-white p-0.5 border border-slate-200"
         />
         <span className="text-slate-800 font-semibold text-sm truncate">
           Alpha Insight
@@ -218,7 +218,7 @@ export function Sidebar({
       )}
 
       {/* Desktop — light sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-200 flex-col z-30">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white/90 backdrop-blur-md border-r border-slate-200/80 flex-col z-30">
         <NavLinks />
       </aside>
     </>
