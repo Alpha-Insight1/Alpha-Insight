@@ -103,13 +103,13 @@ export function Sidebar({
           <Image
             src="/alpha-insight-logo.jpg"
             alt="Alpha Insight"
-            width={40}
-            height={40}
-            className="rounded-xl object-contain shadow-sm bg-white p-0.5"
+            width={48}
+            height={48}
+            className="rounded-xl object-contain shadow-md bg-white p-1 ring-1 ring-slate-200"
             priority
           />
           <div className="min-w-0">
-            <p className="font-bold text-slate-800 text-sm tracking-tight truncate">
+            <p className="font-bold text-slate-800 dark:text-white text-sm tracking-tight truncate">
               Alpha Insight
             </p>
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">
@@ -141,8 +141,8 @@ export function Sidebar({
               className={cn(
                 "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                 active
-                  ? "bg-indigo-50 text-indigo-700 shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-200"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
               )}
             >
               <Icon
@@ -174,7 +174,7 @@ export function Sidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center px-3 gap-3 shadow-sm">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-700/50 flex items-center px-3 gap-3 shadow-sm">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -218,7 +218,7 @@ export function Sidebar({
       )}
 
       {/* Desktop — light sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white/90 backdrop-blur-md border-r border-slate-200/80 flex-col z-30">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border-r border-slate-200/80 dark:border-slate-700/50 flex-col z-30">
         <NavLinks />
       </aside>
     </>

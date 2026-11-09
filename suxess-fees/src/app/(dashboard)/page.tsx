@@ -808,16 +808,14 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand-green">
-            {admin ? "Alpha Insight · overview" : "Campus desk"}
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            Alpha Insight
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
-            Dashboard
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1">
+            {admin ? "Director overview" : "Secretary desk"}
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
             {weekday}
-            <span className="text-gray-300 mx-2">·</span>
-            {admin ? "All three campuses" : scopeLabel}
           </p>
         </div>
         {admin && (
@@ -872,10 +870,7 @@ export default async function DashboardPage() {
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-5">
               <div>
-                <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
-                  Dashboard
-                </h1>
-                <p className="text-sm text-slate-500 mt-0.5">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Welcome back — school performance at a glance
                 </p>
               </div>
@@ -1023,7 +1018,7 @@ export default async function DashboardPage() {
               </p>
               <ul className="mt-3 text-xs text-gray-600 space-y-1">
                 <li className="flex justify-between gap-2">
-                  <span>Branch expenses</span>
+                  <span>Expenses</span>
                   <span className="font-medium">
                     {formatCurrency(expensesTodayAmt)}
                   </span>
@@ -1112,7 +1107,7 @@ export default async function DashboardPage() {
               </p>
               <ul className="mt-3 text-xs text-gray-600 space-y-1">
                 <li className="flex justify-between gap-2">
-                  <span>Branch expenses</span>
+                  <span>Expenses</span>
                   <span className="font-medium">
                     {formatCurrency(totalExpensesMonth)}
                   </span>

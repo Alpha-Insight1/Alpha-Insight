@@ -51,13 +51,13 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-10">
-            <div className="inline-flex rounded-2xl bg-white p-2 shadow-lg">
+            <div className="inline-flex rounded-2xl bg-white p-3 shadow-xl ring-2 ring-white/50">
               <Image
                 src="/alpha-insight-logo.jpg"
                 alt="Alpha Insight"
-                width={64}
-                height={64}
-                className="rounded-xl object-contain"
+                width={96}
+                height={96}
+                className="rounded-xl object-contain w-24 h-24"
                 priority
               />
             </div>
@@ -84,13 +84,13 @@ export default function LoginPage() {
         {/* Right form */}
         <div className="flex flex-col justify-center p-8 sm:p-10">
           <div className="md:hidden flex items-center gap-3 mb-8">
-            <div className="rounded-2xl bg-white p-1.5 shadow border border-slate-100">
+            <div className="rounded-2xl bg-white p-2 shadow-lg border border-slate-100">
               <Image
                 src="/alpha-insight-logo.jpg"
                 alt="Alpha Insight"
-                width={52}
-                height={52}
-                className="rounded-xl object-contain"
+                width={72}
+                height={72}
+                className="rounded-xl object-contain w-[72px] h-[72px]"
                 priority
               />
             </div>
