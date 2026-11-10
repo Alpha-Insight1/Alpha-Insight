@@ -21,6 +21,7 @@ import {
   ListChecks,
   Award,
   Bus,
+  MessageCircle,
   LogOut,
   Menu,
   X,
@@ -38,6 +39,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, show: "all" },
+  { href: "/messages", label: "Messages", icon: MessageCircle, show: "all" },
   { href: "/payments", label: "Record Payment", icon: CreditCard, show: "all" },
   { href: "/outstanding", label: "Outstanding", icon: AlertCircle, show: "all" },
   { href: "/fee-tracker", label: "Fees Tracker", icon: ListChecks, show: "all" },
