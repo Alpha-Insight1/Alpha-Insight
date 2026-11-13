@@ -119,7 +119,7 @@ export function Sidebar({
             </p>
           </div>
         </div>
-        <div className="mt-4 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+        <div className="mt-4 rounded-xl bg-slate-50/90 dark:bg-white/5 border border-slate-100/80 dark:border-white/5 px-3 py-2.5">
           <p className="text-xs font-semibold text-slate-700 truncate">
             {roleLabel || "User"}
           </p>
@@ -141,16 +141,16 @@ export function Sidebar({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150",
                 active
-                  ? "bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-200"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-500 dark:text-white"
+                  : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
               )}
             >
               <Icon
                 className={cn(
                   "w-4 h-4 shrink-0",
-                  active ? "text-indigo-600" : "text-slate-400"
+                  active ? "text-white dark:text-white" : "text-slate-400"
                 )}
               />
               {item.label}
@@ -220,7 +220,7 @@ export function Sidebar({
       )}
 
       {/* Desktop — light sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border-r border-slate-200/80 dark:border-slate-700/50 flex-col z-30">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-white/95 dark:bg-slate-950/90 backdrop-blur-xl border-r border-slate-200/60 dark:border-white/5 flex-col z-30 shadow-[1px_0_0_rgba(15,23,42,0.03)]">
         <NavLinks />
       </aside>
     </>

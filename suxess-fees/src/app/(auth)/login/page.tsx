@@ -42,7 +42,7 @@ export default function LoginPage() {
       <div className="pointer-events-none fixed -left-24 top-10 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl dark:bg-indigo-900/30" />
       <div className="pointer-events-none fixed -right-16 bottom-0 h-80 w-80 rounded-full bg-indigo-200/40 blur-3xl dark:bg-blue-900/20" />
 
-      <div className="relative w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden shadow-xl shadow-slate-200/60 dark:shadow-black/40 border border-white/60 dark:border-slate-700 bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl min-h-[520px]">
+      <div className="relative w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 rounded-3xl overflow-hidden shadow-2xl shadow-slate-300/40 dark:shadow-black/50 border border-white/70 dark:border-white/10 bg-white/80 dark:bg-slate-900/75 backdrop-blur-2xl min-h-[520px]">
         {/* Left brand panel */}
         <div className="relative hidden md:flex flex-col justify-between bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 p-10 text-white">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -169,7 +169,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 shadow-lg shadow-indigo-500/25"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-60 shadow-lg shadow-indigo-600/30 tracking-tight"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>

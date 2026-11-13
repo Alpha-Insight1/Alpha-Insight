@@ -43,7 +43,7 @@ export default async function StudentsPage({
     const q = params.q.trim().replace(/%/g, "");
     if (q) {
       query = query.or(
-        `full_name.ilike.%${q}%,admission_number.ilike.%${q}%,parent_phone.ilike.%${q}%,parent_name.ilike.%${q}%`
+        `full_name.ilike.%${q}%,admission_number.ilike.%${q}%,parent_phone.ilike.%${q}%,parent_name.ilike.%${q}%,class_name.ilike.%${q}%,department.ilike.%${q}%`
       );
     }
   }

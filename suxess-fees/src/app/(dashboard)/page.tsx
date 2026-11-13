@@ -95,10 +95,10 @@ export default async function DashboardPage() {
   const isTutorialSec = !admin && !!profile?.campus_id && !isMainSec;
 
   const scopeLabel = admin
-    ? "All campuses"
+    ? "School"
     : profile?.campuses?.short_name ||
       profile?.campuses?.name ||
-      "Your campus";
+      "Your desk";
 
   const now = new Date();
   const today = isoDate(now);
@@ -812,23 +812,29 @@ export default async function DashboardPage() {
             Alpha Insight
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1">
-            {admin ? "Director overview" : "Secretary desk"}
+            {admin ? "School overview" : "Today at a glance"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
             {weekday}
+            {!admin && scopeLabel ? (
+              <>
+                <span className="text-slate-300 mx-2">·</span>
+                {scopeLabel}
+              </>
+            ) : null}
           </p>
         </div>
         {admin && (
           <div className="flex flex-wrap gap-2">
             <Link
               href="/payments"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:bg-brand-dark"
+              className="ai-btn-primary"
             >
               Record payment <ArrowUpRight className="w-4 h-4" />
             </Link>
             <Link
               href="/outstanding"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="ai-btn-secondary"
             >
               Outstanding
             </Link>
@@ -877,7 +883,7 @@ export default async function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-4 shadow-lg shadow-indigo-500/20">
+              <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-4 shadow-md shadow-indigo-500/15">
                 <p className="text-[11px] font-medium text-indigo-100">
                   Collected today
                 </p>
@@ -885,7 +891,7 @@ export default async function DashboardPage() {
                   {formatCurrency(moneyInToday)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white p-4 shadow-lg shadow-violet-500/20">
+              <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white p-4 shadow-md shadow-violet-500/15">
                 <p className="text-[11px] font-medium text-violet-100">
                   Money out today
                 </p>
@@ -893,7 +899,7 @@ export default async function DashboardPage() {
                   {formatCurrency(moneyOutToday)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white p-4 shadow-lg shadow-sky-500/20">
+              <div className="rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white p-4 shadow-md shadow-sky-500/15">
                 <p className="text-[11px] font-medium text-sky-100">
                   Outstanding
                 </p>
@@ -901,7 +907,7 @@ export default async function DashboardPage() {
                   {formatCurrency(totalOutstanding)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white p-4 shadow-lg shadow-amber-500/20">
+              <div className="rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white p-4 shadow-md shadow-amber-500/15">
                 <p className="text-[11px] font-medium text-amber-50">
                   Active students
                 </p>
@@ -1408,8 +1414,7 @@ export default async function DashboardPage() {
                 <Building2 className="w-4 h-4" /> Track teacher costs
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Teacher daily pay is listed by campus
-                page with daily totals.
+                Record and track teacher payments for your school.
               </p>
               <Link
                 href="/teacher-pay"

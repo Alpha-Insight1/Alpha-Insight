@@ -13,7 +13,7 @@ const SUGGESTIONS = [
   "School bus summary",
 ];
 
-export function AdminAssistant() {
+export function AdminAssistant({ docked = false }: { docked?: boolean }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -81,7 +81,11 @@ export function AdminAssistant() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-brand-navy dark:bg-blue-700 text-white px-4 py-3 shadow-lg hover:bg-brand-blue transition text-sm font-medium"
+        className={
+          docked
+            ? "flex items-center gap-2 rounded-full bg-slate-900 dark:bg-slate-800 text-white pl-3.5 pr-4 py-2.5 shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition text-[13px] font-semibold tracking-tight"
+            : "fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-slate-900 text-white pl-3.5 pr-4 py-2.5 shadow-lg transition text-[13px] font-semibold"
+        }
         title="Ask Alpha"
       >
         <Sparkles className="w-4 h-4" />
