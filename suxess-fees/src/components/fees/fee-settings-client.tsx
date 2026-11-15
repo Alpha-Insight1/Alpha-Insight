@@ -18,6 +18,12 @@ type FeeType = {
   is_active: boolean | null;
 };
 
+function isSchoolBusFeeName(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase().trim();
+  return n.includes("school bus") || n === "bus" || n.includes("bus fee");
+}
+
 export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
   const [rows, setRows] = useState(initial);
   const [newName, setNewName] = useState("");
@@ -36,12 +42,18 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
   const saveRow = async (id: string, name: string, amount: number) => {
     setSaving(id);
     setMsg(null);
+    const payload: Record<string, unknown> = {
+      name: name.trim(),
+    };
+    // School Bus prices live on each bus/route — do not store catalogue price
+    if (!isSchoolBusFeeName(name)) {
+      payload.default_amount = amount;
+    } else {
+      payload.default_amount = 0;
+    }
     const { error } = await supabase
       .from("fee_types")
-      .update({
-        name: name.trim(),
-        default_amount: amount,
-      })
+      .update(payload)
       .eq("id", id);
     setSaving(null);
     if (error) {
@@ -53,7 +65,9 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
       return;
     }
     setMsg(
-      `Saved “${name.trim()}” — secretaries will see ₦${amount.toLocaleString()}`
+      isSchoolBusFeeName(name)
+        ? `Saved “${name.trim()}” — set route prices on School bus page`
+        : `Saved “${name.trim()}” — secretaries will see ₦${amount.toLocaleString()}`
     );
     router.refresh();
   };
@@ -71,7 +85,7 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
       setMsg(
         error.message.includes("foreign key") ||
           error.message.includes("violates")
-          ? `Cannot delete “${deleteTarget.name}” — it is linked to existing student fees or payments. Deactivate it instead or clear those records first.`
+          ? `Cannot delete “${deleteTarget.name}” — it is linked to existing student fees or payments. Clear those records first.`
           : error.message
       );
       setDeleteTarget(null);
@@ -88,7 +102,8 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
     if (!newName.trim()) return;
     setSaving("new");
     setMsg(null);
-    const amount = parseMoneyInput(newAmountDisplay);
+    const isBus = isSchoolBusFeeName(newName);
+    const amount = isBus ? 0 : parseMoneyInput(newAmountDisplay);
     const { error } = await supabase.from("fee_types").insert({
       name: newName.trim(),
       default_amount: amount,
@@ -101,9 +116,15 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
     }
     setNewName("");
     setNewAmountDisplay("");
-    setMsg(`Added “${newName.trim()}” — it will appear on Record Payment`);
+    setMsg(
+      isBus
+        ? `Added “${newName.trim()}” — set prices per route on School bus`
+        : `Added “${newName.trim()}” — it will appear on Record Payment`
+    );
     router.refresh();
   };
+
+  const newIsBus = isSchoolBusFeeName(newName);
 
   return (
     <div className="space-y-6">
@@ -119,8 +140,8 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
             Fee catalogue
           </p>
           <p className="text-xs text-slate-400 mt-0.5">
-            Edit name and price, then Save. You can also delete a fee type.
-            Secretary sees these on Record Payment.
+            Edit name and price, then Save. School Bus has no catalogue price —
+            set price per route on the School bus page.
           </p>
         </div>
         <div className="table-wrap">
@@ -167,12 +188,20 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
           required
         />
-        <MoneyInput
-          value={newAmountDisplay}
-          onValueChange={(d) => setNewAmountDisplay(d)}
-          placeholder="Default price"
-          className="w-full"
-        />
+        {newIsBus ? (
+          <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            School Bus prices are set per route on the{" "}
+            <strong>School bus</strong> page (director only). No default price
+            here.
+          </p>
+        ) : (
+          <MoneyInput
+            value={newAmountDisplay}
+            onValueChange={(d) => setNewAmountDisplay(d)}
+            placeholder="Default price"
+            className="w-full"
+          />
+        )}
         <button
           type="submit"
           disabled={saving === "new"}
@@ -211,6 +240,7 @@ function FeeRow({
   onSave: (name: string, amount: number) => void;
   onDelete: () => void;
 }) {
+  const isBus = isSchoolBusFeeName(row.name);
   const [name, setName] = useState(row.name);
   const [display, setDisplay] = useState(
     formatMoneyInput(String(Math.round(Number(row.default_amount || 0)) || ""))
@@ -231,20 +261,36 @@ function FeeRow({
           onChange={(e) => setName(e.target.value)}
           className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-medium"
         />
+        {isSchoolBusFeeName(name) && (
+          <p className="text-[11px] text-blue-700 mt-1">
+            Price is per bus route → School bus page
+          </p>
+        )}
       </td>
       <td className="px-4 py-3">
-        <MoneyInput
-          value={display}
-          onValueChange={(d) => setDisplay(d)}
-          className="w-40"
-        />
+        {isSchoolBusFeeName(name) ? (
+          <span className="text-xs text-slate-400 italic">
+            Set on School bus
+          </span>
+        ) : (
+          <MoneyInput
+            value={display}
+            onValueChange={(d) => setDisplay(d)}
+            className="w-40"
+          />
+        )}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-3">
           <button
             type="button"
             disabled={saving || !name.trim()}
-            onClick={() => onSave(name, parseMoneyInput(display))}
+            onClick={() =>
+              onSave(
+                name,
+                isSchoolBusFeeName(name) ? 0 : parseMoneyInput(display)
+              )
+            }
             className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
           >
             {saving ? "…" : "Save"}

@@ -3,8 +3,11 @@ import { formatCurrency } from "@/lib/utils";
 import { BusForm } from "@/components/school-bus/bus-form";
 import { AssignStudentForm } from "@/components/school-bus/assign-student-form";
 import { Bus } from "lucide-react";
+import { getCurrentProfile, isAdmin } from "@/lib/auth";
 
 export default async function SchoolBusPage() {
+  const profile = await getCurrentProfile();
+  const admin = isAdmin(profile);
   const supabase = await createClient();
 
   const [{ data: buses, error }, { data: assignments }, { data: students }] =
@@ -49,7 +52,13 @@ export default async function SchoolBusPage() {
             Buses, routes, drivers and student assignments
           </p>
         </div>
-        <BusForm />
+        {admin ? (
+          <BusForm />
+        ) : (
+          <p className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+            Only director can add buses, routes and prices
+          </p>
+        )}
       </div>
 
       {error && (

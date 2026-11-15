@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { FeeTrackerFilters } from "@/components/fees/fee-tracker-filters";
 
 type Status = "paid" | "partial" | "unpaid" | "scholarship" | "none";
 
@@ -43,9 +44,11 @@ export default async function FeeTrackerPage({
     "";
 
   const selectedFee = types.find((t: any) => t.id === selectedFeeId);
-  const isSchoolFee = String(selectedFee?.name || "")
-    .toLowerCase()
-    .includes("school fee");
+  const feeName = String(selectedFee?.name || "");
+  const isSchoolFee = feeName.toLowerCase().includes("school fee");
+  const isSchoolBus = feeName.toLowerCase().includes("bus");
+  // Term-scoped: school fees always; also when recording with session/term
+  const useSessionTerm = isSchoolFee || !isSchoolBus;
 
   let studentsQ = supabase
     .from("students")
@@ -59,15 +62,16 @@ export default async function FeeTrackerPage({
 
   let feesQ = supabase
     .from("student_fees")
-    .select("student_id, amount, amount_paid, balance, session, term, fee_type_id")
+    .select(
+      "student_id, amount, amount_paid, balance, session, term, fee_type_id"
+    )
     .limit(8000);
   if (selectedFeeId) feesQ = feesQ.eq("fee_type_id", selectedFeeId);
-  // Term-based fees: filter session/term; one-off fees (uniform, WAEC): all sessions
-  if (isSchoolFee) {
+  if (useSessionTerm) {
     feesQ = feesQ.eq("session", session).eq("term", term);
   }
 
-  const [{ data: students }, { data: fees }, { data: scholarships }] =
+  const [{ data: students }, { data: fees }, { data: scholarships }, { data: allStudentsForClasses }] =
     await Promise.all([
       studentsQ,
       selectedFeeId ? feesQ : Promise.resolve({ data: [] as any[] }),
@@ -80,7 +84,19 @@ export default async function FeeTrackerPage({
             .eq("status", "active")
             .limit(2000)
         : Promise.resolve({ data: [] as any[] }),
+      supabase
+        .from("students")
+        .select("class_name")
+        .eq("status", "active")
+        .limit(2000),
     ]);
+
+  const classSet = new Set<string>();
+  for (const s of allStudentsForClasses || []) {
+    const c = (s.class_name || "").trim();
+    if (c) classSet.add(c);
+  }
+  const classes = Array.from(classSet).sort((a, b) => a.localeCompare(b));
 
   const feeByStudent = new Map<string, any>();
   for (const f of fees || []) {
@@ -139,7 +155,6 @@ export default async function FeeTrackerPage({
     };
   });
 
-  // For one-off fees: show people who have a record first when filtering paid/partial/unpaid
   if (statusFilter === "paid") rows = rows.filter((r) => r.status === "paid");
   else if (statusFilter === "partial")
     rows = rows.filter((r) => r.status === "partial");
@@ -150,23 +165,35 @@ export default async function FeeTrackerPage({
   else if (statusFilter === "recorded")
     rows = rows.filter((r) => r.status !== "none");
 
+  const allRowsBase = (students || []).map((s: any) => {
+    const fee = feeByStudent.get(s.id);
+    const amount = Number(fee?.amount || 0);
+    const amount_paid = Number(fee?.amount_paid || 0);
+    const balance = fee ? Number(fee.balance ?? amount - amount_paid) : 0;
+    const onScholarship = scholarshipStudents.has(s.id);
+    let status: Status = "none";
+    if (onScholarship && isSchoolFee) status = "scholarship";
+    else if (!fee) status = "none";
+    else if (balance <= 0 && amount_paid > 0) status = "paid";
+    else if (amount_paid > 0 && balance > 0) status = "partial";
+    else status = "unpaid";
+    return { status, amount, amount_paid, balance };
+  });
+
   const counts = {
-    all: (students || []).length,
-    paid: (students || []).filter((s: any) => {
-      const f = feeByStudent.get(s.id);
-      if (!f) return false;
-      return Number(f.balance ?? 0) <= 0 && Number(f.amount_paid || 0) > 0;
-    }).length,
-    partial: (students || []).filter((s: any) => {
-      const f = feeByStudent.get(s.id);
-      return f && Number(f.amount_paid || 0) > 0 && Number(f.balance ?? 0) > 0;
-    }).length,
-    unpaid: (students || []).filter((s: any) => {
-      const f = feeByStudent.get(s.id);
-      return !f || (Number(f.amount_paid || 0) === 0 && Number(f.amount || 0) > 0);
-    }).length,
-    recorded: feeByStudent.size,
+    all: allRowsBase.length,
+    paid: allRowsBase.filter((r) => r.status === "paid").length,
+    partial: allRowsBase.filter((r) => r.status === "partial").length,
+    unpaid: allRowsBase.filter(
+      (r) => r.status === "unpaid" || r.status === "none"
+    ).length,
+    scholarship: allRowsBase.filter((r) => r.status === "scholarship").length,
+    recorded: allRowsBase.filter((r) => r.status !== "none").length,
   };
+
+  const totalExpected = allRowsBase.reduce((s, r) => s + r.amount, 0);
+  const totalCollected = allRowsBase.reduce((s, r) => s + r.amount_paid, 0);
+  const totalBalance = allRowsBase.reduce((s, r) => s + Math.max(0, r.balance), 0);
 
   function href(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams();
@@ -175,7 +202,8 @@ export default async function FeeTrackerPage({
     p.set("term", extra.term ?? term);
     if ((extra.status ?? statusFilter) !== "all")
       p.set("status", extra.status ?? statusFilter);
-    if (classFilter) p.set("class", classFilter);
+    const cls = extra.class !== undefined ? extra.class : classFilter;
+    if (cls) p.set("class", cls);
     return `/fee-tracker?${p.toString()}`;
   }
 
@@ -187,7 +215,7 @@ export default async function FeeTrackerPage({
             Fees tracker
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Track who paid school fees, uniform, WAEC, testimonial, and more
+            Who paid school fees, bus, WAEC and more — by session and term
           </p>
         </div>
         {admin && (
@@ -220,23 +248,53 @@ export default async function FeeTrackerPage({
         )}
       </div>
 
-      {isSchoolFee && (
-        <div className="flex flex-wrap gap-3 mb-4 text-sm">
-          <label className="flex items-center gap-2">
-            <span className="text-slate-500">Session</span>
-            <span className="font-medium">{session}</span>
-          </label>
-          <span className="text-slate-300">·</span>
-          <label className="flex items-center gap-2">
-            <span className="text-slate-500">Term</span>
-            <span className="font-medium">{term}</span>
-          </label>
-          <span className="text-xs text-slate-400">
-            (change via URL or payments when recording)
-          </span>
-        </div>
-      )}
+      {/* Session / term / class filters */}
+      <FeeTrackerFilters
+        session={session}
+        term={term}
+        classFilter={classFilter}
+        feeId={selectedFeeId}
+        status={statusFilter}
+        classes={classes}
+      />
 
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <SummaryCard
+          label="Fully paid"
+          value={String(counts.paid)}
+          sub={`${counts.all ? Math.round((counts.paid / counts.all) * 100) : 0}% of students`}
+          tone="green"
+        />
+        <SummaryCard
+          label="Partial"
+          value={String(counts.partial)}
+          sub="Paid something, still owe"
+          tone="amber"
+        />
+        <SummaryCard
+          label="Unpaid / no record"
+          value={String(counts.unpaid)}
+          sub={
+            counts.scholarship
+              ? `${counts.scholarship} on scholarship`
+              : "No payment yet"
+          }
+          tone="rose"
+        />
+        <SummaryCard
+          label="Collected"
+          value={formatCurrency(totalCollected)}
+          sub={
+            totalExpected > 0
+              ? `of ${formatCurrency(totalExpected)} expected · ${formatCurrency(totalBalance)} balance`
+              : "No fee amounts recorded"
+          }
+          tone="indigo"
+        />
+      </div>
+
+      {/* Status chips */}
       <div className="flex flex-wrap gap-2 mb-4">
         {(
           [
@@ -245,7 +303,12 @@ export default async function FeeTrackerPage({
             ["paid", `Paid (${counts.paid})`],
             ["partial", `Partial (${counts.partial})`],
             ["unpaid", `Unpaid / none (${counts.unpaid})`],
-            ...(isSchoolFee ? [["scholarship", "Scholarship"]] : []),
+            ...(isSchoolFee
+              ? ([["scholarship", `Scholarship (${counts.scholarship})`]] as [
+                  string,
+                  string
+                ][])
+              : []),
           ] as [string, string][]
         ).map(([id, label]) => (
           <Link
@@ -262,6 +325,21 @@ export default async function FeeTrackerPage({
         ))}
       </div>
 
+      <p className="text-xs text-slate-400 mb-2">
+        Showing <strong>{selectedFee?.name || "—"}</strong>
+        {useSessionTerm ? (
+          <>
+            {" "}
+            · {session} · {term}
+          </>
+        ) : (
+          <> · all sessions (bus / one-off style)</>
+        )}
+        {classFilter ? ` · class ${classFilter}` : ""}
+        {" · "}
+        {rows.length} row{rows.length === 1 ? "" : "s"}
+      </p>
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="table-wrap">
           <table className="w-full text-sm">
@@ -277,7 +355,10 @@ export default async function FeeTrackerPage({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-white/5">
+                <tr
+                  key={r.id}
+                  className="hover:bg-slate-50/80 dark:hover:bg-white/5"
+                >
                   <td className="px-4 py-3">
                     <Link
                       href={`/students/${r.id}`}
@@ -313,6 +394,32 @@ export default async function FeeTrackerPage({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone: "green" | "amber" | "rose" | "indigo";
+}) {
+  const tones = {
+    green: "border-emerald-200 bg-emerald-50/80 text-emerald-900",
+    amber: "border-amber-200 bg-amber-50/80 text-amber-900",
+    rose: "border-rose-200 bg-rose-50/80 text-rose-900",
+    indigo: "border-indigo-200 bg-indigo-50/80 text-indigo-900",
+  };
+  return (
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <p className="text-xs font-medium opacity-80">{label}</p>
+      <p className="text-xl font-bold mt-1 tabular-nums">{value}</p>
+      <p className="text-[11px] mt-1 opacity-70 leading-snug">{sub}</p>
     </div>
   );
 }
