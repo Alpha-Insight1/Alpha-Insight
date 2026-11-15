@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -26,19 +26,30 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
   const router = useRouter();
   const supabase = createClient();
 
-  const saveAmount = async (id: string, amount: number) => {
+  useEffect(() => {
+    setRows(initial);
+  }, [initial]);
+
+  const saveRow = async (id: string, name: string, amount: number) => {
     setSaving(id);
     setMsg(null);
     const { error } = await supabase
       .from("fee_types")
-      .update({ default_amount: amount })
+      .update({
+        name: name.trim(),
+        default_amount: amount,
+      })
       .eq("id", id);
     setSaving(null);
     if (error) {
-      setMsg(error.message + " — run sql/02 in Supabase for default_amount");
+      setMsg(
+        error.message.includes("default_amount")
+          ? "Run sql/04-FIX-PAYMENT-COLUMNS.sql in Supabase, then save again."
+          : error.message
+      );
       return;
     }
-    setMsg("Saved");
+    setMsg(`Saved “${name.trim()}” — secretaries will see ₦${amount.toLocaleString()}`);
     router.refresh();
   };
 
@@ -47,9 +58,10 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
     if (!newName.trim()) return;
     setSaving("new");
     setMsg(null);
+    const amount = parseMoneyInput(newAmountDisplay);
     const { error } = await supabase.from("fee_types").insert({
       name: newName.trim(),
-      default_amount: parseMoneyInput(newAmountDisplay),
+      default_amount: amount,
       is_active: true,
     });
     setSaving(null);
@@ -59,25 +71,34 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
     }
     setNewName("");
     setNewAmountDisplay("");
+    setMsg(`Added “${newName.trim()}” — it will appear on Record Payment`);
     router.refresh();
   };
 
   return (
     <div className="space-y-6">
       {msg && (
-        <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+        <p className="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
           {msg}
         </p>
       )}
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">
+            Fee catalogue
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Edit name and price. Secretary sees these on Record Payment.
+          </p>
+        </div>
         <div className="table-wrap">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-white/5 text-left text-xs uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3">Fee type</th>
+                <th className="px-4 py-3">Fee name</th>
                 <th className="px-4 py-3">Default price (₦)</th>
-                <th className="px-4 py-3 w-28"></th>
+                <th className="px-4 py-3 w-24"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -86,14 +107,7 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
                   key={r.id}
                   row={r}
                   saving={saving === r.id}
-                  onSave={(amt) => {
-                    setRows((list) =>
-                      list.map((x) =>
-                        x.id === r.id ? { ...x, default_amount: amt } : x
-                      )
-                    );
-                    saveAmount(r.id, amt);
-                  }}
+                  onSave={(name, amt) => saveRow(r.id, name, amt)}
                 />
               ))}
             </tbody>
@@ -101,7 +115,7 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
         </div>
         {rows.length === 0 && (
           <p className="p-6 text-center text-slate-400 text-sm">
-            No fee types yet — add one below
+            No fee types — add School Fees, NECO, JAMB, Uniform, School Bus below
           </p>
         )}
       </div>
@@ -111,19 +125,19 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
         className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-3 max-w-lg"
       >
         <p className="font-semibold text-slate-800 dark:text-white text-sm">
-          Add fee type
+          Add another fee type
         </p>
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="e.g. Testimonial, Uniform, WAEC"
+          placeholder="Fee name (e.g. Testimonial, WAEC)"
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
           required
         />
         <MoneyInput
           value={newAmountDisplay}
           onValueChange={(d) => setNewAmountDisplay(d)}
-          placeholder="0"
+          placeholder="Default price"
           className="w-full"
         />
         <button
@@ -145,15 +159,28 @@ function FeeRow({
 }: {
   row: FeeType;
   saving: boolean;
-  onSave: (n: number) => void;
+  onSave: (name: string, amount: number) => void;
 }) {
+  const [name, setName] = useState(row.name);
   const [display, setDisplay] = useState(
-    formatMoneyInput(String(Math.round(Number(row.default_amount || 0))))
+    formatMoneyInput(String(Math.round(Number(row.default_amount || 0)) || ""))
   );
+
+  useEffect(() => {
+    setName(row.name);
+    setDisplay(
+      formatMoneyInput(String(Math.round(Number(row.default_amount || 0)) || ""))
+    );
+  }, [row.id, row.name, row.default_amount]);
+
   return (
     <tr>
-      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
-        {row.name}
+      <td className="px-4 py-3">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-medium"
+        />
       </td>
       <td className="px-4 py-3">
         <MoneyInput
@@ -165,8 +192,8 @@ function FeeRow({
       <td className="px-4 py-3">
         <button
           type="button"
-          disabled={saving}
-          onClick={() => onSave(parseMoneyInput(display))}
+          disabled={saving || !name.trim()}
+          onClick={() => onSave(name, parseMoneyInput(display))}
           className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
         >
           {saving ? "…" : "Save"}

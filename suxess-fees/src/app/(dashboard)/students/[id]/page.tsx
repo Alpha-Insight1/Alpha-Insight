@@ -53,7 +53,7 @@ export default async function StudentProfilePage({
         .eq("student_id", id)
         .order("payment_date", { ascending: false })
         .limit(50),
-      supabase.from("fee_types").select("id, name").order("name"),
+      supabase.from("fee_types").select("id, name, default_amount").order("name"),
       supabase
         .from("scholarships")
         .select("id, session, term, coverage, amount_covered, reason, status")

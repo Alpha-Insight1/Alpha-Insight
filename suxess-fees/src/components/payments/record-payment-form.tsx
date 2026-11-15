@@ -211,20 +211,10 @@ export function RecordPaymentForm({
   const selectedStudent = students.find((s) => s.id === studentId);
   const isTutorialStudent = isStudentTutorial(selectedStudent?.campuses);
 
-  const displayFeeTypes = (() => {
-    const allowed = feeTypes.filter((ft) => isAllowedFeeTypeName(ft.name));
-    const examHints = ["jamb", "waec", "neco", "gce", "bece", "ssce"];
-    const isExam = (n: string) =>
-      examHints.some((h) => n.toLowerCase().includes(h));
-    const list = allowed.length > 0 ? [...allowed] : [...feeTypes];
-    if (!isTutorialStudent) return list.sort((a, b) => a.name.localeCompare(b.name));
-    return list.sort((a, b) => {
-      const ae = isExam(a.name) ? 0 : 1;
-      const be = isExam(b.name) ? 0 : 1;
-      if (ae !== be) return ae - be;
-      return a.name.localeCompare(b.name);
-    });
-  })();
+  // All fee types from admin catalogue (with default prices)
+  const displayFeeTypes = [...feeTypes].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   const selectedFee = outstandingFees.find((f) => f.id === studentFeeId);
   const selectedFeeTypeName =
@@ -723,14 +713,17 @@ export function RecordPaymentForm({
                   className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green"
                 >
                   <option value="">Select fee type</option>
-                  {displayFeeTypes.map((ft) => (
-                    <option key={ft.id} value={ft.id}>
-                      {ft.name}
-                      {Number(ft.default_amount || 0) > 0
-                        ? ` — ₦${Number(ft.default_amount).toLocaleString("en-NG")}`
-                        : ""}
-                    </option>
-                  ))}
+                  {displayFeeTypes.map((ft) => {
+                    const price = Number(ft.default_amount || 0);
+                    return (
+                      <option key={ft.id} value={ft.id}>
+                        {ft.name}
+                        {price > 0
+                          ? ` — ₦${price.toLocaleString("en-NG")}`
+                          : " — (set price in Fee Prices)"}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
