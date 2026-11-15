@@ -214,7 +214,14 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
     const { error } = await supabase.from("students").insert(payload);
     setLoading(false);
     if (error) {
-      setErrorMsg(error.message);
+      const msg = error.message || "Could not register student";
+      if (msg.includes("schema cache") || msg.includes("address") || msg.includes("column")) {
+        setErrorMsg(
+          "Database needs an update. In Supabase SQL Editor, run FIX-STUDENTS-SCHEMA.sql then try again."
+        );
+      } else {
+        setErrorMsg(msg);
+      }
       return;
     }
     setForm({
