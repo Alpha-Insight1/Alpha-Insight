@@ -57,7 +57,13 @@ export function AssignStudentForm({
     });
     setLoading(false);
     if (error) {
-      setErrorMsg(error.message);
+      setErrorMsg(
+        error.message.includes("schema") ||
+          error.message.includes("student_bus") ||
+          error.message.includes("does not exist")
+          ? "School bus tables missing. In Supabase run sql/02-RUN-ON-YOUR-CURRENT-PROJECT.sql then try again."
+          : error.message
+      );
       return;
     }
     setStudentId("");
@@ -75,17 +81,23 @@ export function AssignStudentForm({
         <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
           Assign student to bus
         </h3>
-        <select
-          value={busId}
-          onChange={(e) => setBusId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-        >
-          {buses.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+        {buses.length === 0 ? (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-2">
+            Add a bus first (top right), then assign students.
+          </p>
+        ) : (
+          <select
+            value={busId}
+            onChange={(e) => setBusId(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          >
+            {buses.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           type="search"
           placeholder="Search student…"

@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { href: "/payments", label: "Record Payment", icon: CreditCard, show: "all" },
   { href: "/outstanding", label: "Outstanding", icon: AlertCircle, show: "all" },
   { href: "/fee-tracker", label: "Fees Tracker", icon: ListChecks, show: "all" },
+  { href: "/fee-settings", label: "Fee Prices", icon: Banknote, show: "admin" },
   { href: "/students", label: "Students", icon: Users, show: "all" },
   { href: "/receipts", label: "Receipts", icon: Receipt, show: "all" },
   { href: "/school-bus", label: "School Bus", icon: Bus, show: "all" },

@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
-import { getCurrentProfile, campusFilter, isAdmin } from "@/lib/auth";
+import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
-type Status = "paid" | "partial" | "unpaid" | "scholarship";
+type Status = "paid" | "partial" | "unpaid" | "scholarship" | "none";
 
 export default async function FeeTrackerPage({
   searchParams,
@@ -14,79 +14,72 @@ export default async function FeeTrackerPage({
     term?: string;
     status?: string;
     class?: string;
+    fee?: string;
   }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
   const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
   const admin = isAdmin(profile);
-  const lockedCampus = campusFilter(profile);
-
-  // Main school secretaries + admin only
-  
 
   const session = (params.session || "2025/2026").trim();
   const term = (params.term || "First Term").trim();
   const statusFilter = (params.status || "all").trim();
   const classFilter = (params.class || "").trim();
 
-  // Prefer Main campus for school tracker
-  let mainCampusId = lockedCampus || undefined;
-  if (admin && !mainCampusId) {
-    const { data: camps } = await supabase
-      .from("campuses")
-      .select("id, name, short_name")
-      .eq("is_active", true);
-    const main = (camps || []).find((c) => {
-      const L = `${c.short_name || ""} ${c.name || ""}`.toLowerCase();
-      return L.includes("main") || L.includes("school");
-    });
-    mainCampusId = main?.id;
-  }
+  const { data: feeTypes } = await supabase
+    .from("fee_types")
+    .select("id, name, default_amount")
+    .order("name");
+
+  const types = feeTypes || [];
+  const selectedFeeId =
+    params.fee ||
+    types.find((t: any) =>
+      String(t.name).toLowerCase().includes("school fee")
+    )?.id ||
+    types[0]?.id ||
+    "";
+
+  const selectedFee = types.find((t: any) => t.id === selectedFeeId);
+  const isSchoolFee = String(selectedFee?.name || "")
+    .toLowerCase()
+    .includes("school fee");
 
   let studentsQ = supabase
     .from("students")
     .select(
-      "id, full_name, admission_number, class_name, parent_name, parent_phone, status, campus_id, campuses(short_name, name)"
+      "id, full_name, admission_number, class_name, parent_name, parent_phone, status"
     )
     .eq("status", "active")
-    .order("class_name")
     .order("full_name")
     .limit(2000);
-  if (mainCampusId) studentsQ = studentsQ.eq("campus_id", mainCampusId);
   if (classFilter) studentsQ = studentsQ.ilike("class_name", classFilter);
 
-  const { data: feeTypes } = await supabase
-    .from("fee_types")
-    .select("id, name");
-  const schoolFeeIds = (feeTypes || [])
-    .filter((ft: any) => {
-      const n = String(ft.name || "").toLowerCase();
-      return n.includes("school fee") || n === "school fees";
-    })
-    .map((ft: any) => ft.id);
+  let feesQ = supabase
+    .from("student_fees")
+    .select("student_id, amount, amount_paid, balance, session, term, fee_type_id")
+    .limit(8000);
+  if (selectedFeeId) feesQ = feesQ.eq("fee_type_id", selectedFeeId);
+  // Term-based fees: filter session/term; one-off fees (uniform, WAEC): all sessions
+  if (isSchoolFee) {
+    feesQ = feesQ.eq("session", session).eq("term", term);
+  }
 
   const [{ data: students }, { data: fees }, { data: scholarships }] =
     await Promise.all([
       studentsQ,
-      schoolFeeIds.length
+      selectedFeeId ? feesQ : Promise.resolve({ data: [] as any[] }),
+      isSchoolFee
         ? supabase
-            .from("student_fees")
-            .select(
-              "student_id, amount, amount_paid, balance, session, term, fee_type_id"
-            )
-            .in("fee_type_id", schoolFeeIds)
+            .from("scholarships")
+            .select("id, student_id, session, term, coverage, status")
             .eq("session", session)
             .eq("term", term)
-            .limit(5000)
+            .eq("status", "active")
+            .limit(2000)
         : Promise.resolve({ data: [] as any[] }),
-      supabase
-        .from("scholarships")
-        .select("id, student_id, session, term, coverage, amount_covered, status")
-        .eq("session", session)
-        .eq("term", term)
-        .eq("status", "active")
-        .limit(2000),
     ]);
 
   const feeByStudent = new Map<string, any>();
@@ -94,7 +87,6 @@ export default async function FeeTrackerPage({
     const prev = feeByStudent.get(f.student_id);
     if (!prev) feeByStudent.set(f.student_id, f);
     else {
-      // merge if multiple lines
       feeByStudent.set(f.student_id, {
         ...prev,
         amount: Number(prev.amount || 0) + Number(f.amount || 0),
@@ -107,321 +99,244 @@ export default async function FeeTrackerPage({
   const scholarshipStudents = new Set(
     (scholarships || []).map((s: any) => s.student_id)
   );
-  const scholarshipMeta = new Map(
-    (scholarships || []).map((s: any) => [s.student_id, s])
-  );
 
   type Row = {
     id: string;
     full_name: string;
     admission_number: string;
     class_name: string;
-    parent_name?: string | null;
     parent_phone?: string | null;
     status: Status;
     amount: number;
     amount_paid: number;
     balance: number;
-    scholarship?: any;
   };
 
-  const rows: Row[] = (students || []).map((s: any) => {
+  let rows: Row[] = (students || []).map((s: any) => {
     const onScholarship = scholarshipStudents.has(s.id);
     const fee = feeByStudent.get(s.id);
     const amount = Number(fee?.amount || 0);
     const amount_paid = Number(fee?.amount_paid || 0);
-    const balance = fee
-      ? Number(fee.balance || 0)
-      : onScholarship
-        ? 0
-        : -1; // -1 = no fee recorded
+    const balance = fee ? Number(fee.balance ?? amount - amount_paid) : 0;
 
-    let status: Status = "unpaid";
-    if (onScholarship) status = "scholarship";
-    else if (!fee || amount_paid <= 0) status = "unpaid";
-    else if (balance <= 0) status = "paid";
-    else status = "partial";
+    let status: Status = "none";
+    if (onScholarship && isSchoolFee) status = "scholarship";
+    else if (!fee) status = "none";
+    else if (balance <= 0 && amount_paid > 0) status = "paid";
+    else if (amount_paid > 0 && balance > 0) status = "partial";
+    else status = "unpaid";
 
     return {
       id: s.id,
       full_name: s.full_name,
       admission_number: s.admission_number,
       class_name: s.class_name || "—",
-      parent_name: s.parent_name,
       parent_phone: s.parent_phone,
       status,
-      amount: amount > 0 ? amount : 0,
+      amount,
       amount_paid,
-      balance: balance < 0 ? 0 : balance,
-      scholarship: scholarshipMeta.get(s.id),
+      balance,
     };
   });
 
+  // For one-off fees: show people who have a record first when filtering paid/partial/unpaid
+  if (statusFilter === "paid") rows = rows.filter((r) => r.status === "paid");
+  else if (statusFilter === "partial")
+    rows = rows.filter((r) => r.status === "partial");
+  else if (statusFilter === "unpaid")
+    rows = rows.filter((r) => r.status === "unpaid" || r.status === "none");
+  else if (statusFilter === "scholarship")
+    rows = rows.filter((r) => r.status === "scholarship");
+  else if (statusFilter === "recorded")
+    rows = rows.filter((r) => r.status !== "none");
+
   const counts = {
-    paid: rows.filter((r) => r.status === "paid").length,
-    partial: rows.filter((r) => r.status === "partial").length,
-    unpaid: rows.filter((r) => r.status === "unpaid").length,
-    scholarship: rows.filter((r) => r.status === "scholarship").length,
-    remaining: rows.filter(
-      (r) => r.status === "unpaid" || r.status === "partial"
-    ).length,
-    all: rows.length,
+    all: (students || []).length,
+    paid: (students || []).filter((s: any) => {
+      const f = feeByStudent.get(s.id);
+      if (!f) return false;
+      return Number(f.balance ?? 0) <= 0 && Number(f.amount_paid || 0) > 0;
+    }).length,
+    partial: (students || []).filter((s: any) => {
+      const f = feeByStudent.get(s.id);
+      return f && Number(f.amount_paid || 0) > 0 && Number(f.balance ?? 0) > 0;
+    }).length,
+    unpaid: (students || []).filter((s: any) => {
+      const f = feeByStudent.get(s.id);
+      return !f || (Number(f.amount_paid || 0) === 0 && Number(f.amount || 0) > 0);
+    }).length,
+    recorded: feeByStudent.size,
   };
 
-  const filtered =
-    statusFilter === "all"
-      ? rows
-      : statusFilter === "remaining"
-        ? rows.filter((r) => r.status === "unpaid" || r.status === "partial")
-        : rows.filter((r) => r.status === statusFilter);
-
-  const classSet = new Set(rows.map((r) => r.class_name).filter(Boolean));
-  const classList = Array.from(classSet).sort();
-
-  const terms = ["First Term", "Second Term", "Third Term"];
-  const sessions = ["2024/2025", "2025/2026", "2026/2027"];
-
-  function href(overrides: Record<string, string>) {
+  function href(extra: Record<string, string | undefined>) {
     const p = new URLSearchParams();
-    p.set("session", overrides.session ?? session);
-    p.set("term", overrides.term ?? term);
-    const st = overrides.status ?? statusFilter;
-    if (st && st !== "all") p.set("status", st);
-    const cl = overrides.class ?? classFilter;
-    if (cl) p.set("class", cl);
+    p.set("fee", extra.fee ?? selectedFeeId);
+    p.set("session", extra.session ?? session);
+    p.set("term", extra.term ?? term);
+    if ((extra.status ?? statusFilter) !== "all")
+      p.set("status", extra.status ?? statusFilter);
+    if (classFilter) p.set("class", classFilter);
     return `/fee-tracker?${p.toString()}`;
   }
 
-  const statusStyle: Record<Status, string> = {
-    paid: "bg-green-100 text-green-800",
-    partial: "bg-amber-100 text-amber-900",
-    unpaid: "bg-red-100 text-red-800",
-    scholarship: "bg-blue-100 text-blue-900",
-  };
-
   return (
     <div>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            School fees tracker
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Fees tracker
           </h1>
-          <p className="text-gray-500 mt-1">
-            Who has paid, partial, unpaid, or is on scholarship — by session and
-            term. <strong>Others remaining</strong> = not fully paid yet
-            (partial + not paid).
-            {admin ? " · Main school focus" : ""}
+          <p className="text-sm text-slate-500 mt-1">
+            Track who paid school fees, uniform, WAEC, testimonial, and more
           </p>
         </div>
         {admin && (
-          <Link
-            href="/scholarships"
-            className="inline-flex items-center px-4 py-2.5 bg-blue-700 text-white text-sm font-medium rounded-lg hover:bg-blue-800"
-          >
-            Manage scholarships
+          <Link href="/fee-settings" className="ai-btn-secondary text-sm">
+            Set fee prices →
           </Link>
         )}
       </div>
 
-      {/* Session / term */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6 space-y-3">
-        <div className="flex flex-wrap gap-4">
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Session</p>
-            <div className="flex flex-wrap gap-2">
-              {sessions.map((s) => (
-                <Link
-                  key={s}
-                  href={href({ session: s })}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-                    session === s
-                      ? "bg-brand-green text-white border-brand-green"
-                      : "bg-white text-gray-700 border-gray-300"
-                  }`}
-                >
-                  {s}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Term</p>
-            <div className="flex flex-wrap gap-2">
-              {terms.map((tm) => (
-                <Link
-                  key={tm}
-                  href={href({ term: tm })}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-                    term === tm
-                      ? "bg-brand-green text-white border-brand-green"
-                      : "bg-white text-gray-700 border-gray-300"
-                  }`}
-                >
-                  {tm}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-        <p className="text-sm text-gray-600">
-          Viewing{" "}
-          <span className="font-semibold text-gray-900">
-            {session} · {term}
-          </span>
-        </p>
+      {/* Fee type tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {types.map((t: any) => (
+          <Link
+            key={t.id}
+            href={href({ fee: t.id, status: "all" })}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+              selectedFeeId === t.id
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200 dark:border-slate-700"
+            }`}
+          >
+            {t.name}
+          </Link>
+        ))}
+        {types.length === 0 && (
+          <p className="text-sm text-amber-700">
+            No fee types. Admin: open Fee prices and add School Fees, Uniform,
+            etc.
+          </p>
+        )}
       </div>
 
-      {/* Status cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+      {isSchoolFee && (
+        <div className="flex flex-wrap gap-3 mb-4 text-sm">
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Session</span>
+            <span className="font-medium">{session}</span>
+          </label>
+          <span className="text-slate-300">·</span>
+          <label className="flex items-center gap-2">
+            <span className="text-slate-500">Term</span>
+            <span className="font-medium">{term}</span>
+          </label>
+          <span className="text-xs text-slate-400">
+            (change via URL or payments when recording)
+          </span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mb-4">
         {(
           [
-            ["all", "All students", counts.all, "border-gray-200"],
-            ["paid", "Fully paid", counts.paid, "border-green-200"],
-            ["partial", "Partial", counts.partial, "border-amber-200"],
-            ["unpaid", "Not paid", counts.unpaid, "border-red-200"],
-            [
-              "scholarship",
-              "Scholarship",
-              counts.scholarship,
-              "border-blue-200",
-            ],
-            [
-              "remaining",
-              "Others remaining",
-              counts.remaining,
-              "border-orange-300",
-            ],
-          ] as const
-        ).map(([id, label, count, border]) => (
+            ["all", `All (${counts.all})`],
+            ["recorded", `Has record (${counts.recorded})`],
+            ["paid", `Paid (${counts.paid})`],
+            ["partial", `Partial (${counts.partial})`],
+            ["unpaid", `Unpaid / none (${counts.unpaid})`],
+            ...(isSchoolFee ? [["scholarship", "Scholarship"]] : []),
+          ] as [string, string][]
+        ).map(([id, label]) => (
           <Link
             key={id}
             href={href({ status: id })}
-            className={`bg-white rounded-xl border-2 p-4 shadow-sm hover:shadow transition ${border} ${
-              statusFilter === id ? "ring-2 ring-brand-green" : ""
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${
+              statusFilter === id
+                ? "bg-slate-900 text-white border-slate-900 dark:bg-indigo-600 dark:border-indigo-600"
+                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
             }`}
           >
-            <p className="text-xs text-gray-500 font-medium">{label}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{count}</p>
+            {label}
           </Link>
         ))}
       </div>
 
-      {classList.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Link
-            href={href({ class: "" })}
-            className={`px-3 py-1 rounded-full text-xs font-medium border ${
-              !classFilter
-                ? "bg-gray-900 text-white border-gray-900"
-                : "bg-white text-gray-600 border-gray-300"
-            }`}
-          >
-            All classes
-          </Link>
-          {classList.map((c) => (
-            <Link
-              key={c}
-              href={href({ class: c })}
-              className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                classFilter === c
-                  ? "bg-brand-green text-white border-brand-green"
-                  : "bg-white text-gray-600 border-gray-300"
-              }`}
-            >
-              {c}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="table-wrap">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Student</th>
-                <th className="text-left px-4 py-3 font-medium">Class</th>
-                <th className="text-left px-4 py-3 font-medium">Status</th>
-                <th className="text-right px-4 py-3 font-medium">Fee</th>
-                <th className="text-right px-4 py-3 font-medium">Paid</th>
-                <th className="text-right px-4 py-3 font-medium">Balance</th>
-                <th className="text-left px-4 py-3 font-medium">Parent</th>
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-white/5">
+                <th className="px-4 py-3">Student</th>
+                <th className="px-4 py-3">Class</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3 text-right">Paid</th>
+                <th className="px-4 py-3 text-right">Balance</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-12 text-center text-gray-400"
-                  >
-                    No students in this view
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {rows.map((r) => (
+                <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-white/5">
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/students/${r.id}`}
+                      className="font-medium text-indigo-600 hover:underline"
+                    >
+                      {r.full_name}
+                    </Link>
+                    <span className="block text-xs text-slate-400">
+                      {r.admission_number}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{r.class_name}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={r.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {r.status === "none" ? "—" : formatCurrency(r.amount)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {r.status === "none" ? "—" : formatCurrency(r.amount_paid)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium">
+                    {r.status === "none" ? "—" : formatCurrency(r.balance)}
                   </td>
                 </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/students/${r.id}`}
-                        className="font-medium text-gray-900 hover:text-brand-green hover:underline"
-                      >
-                        {r.full_name}
-                      </Link>
-                      <div className="text-xs text-gray-400">
-                        {r.admission_number}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{r.class_name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${statusStyle[r.status]}`}
-                      >
-                        {r.status === "scholarship"
-                          ? "Scholarship"
-                          : r.status === "paid"
-                            ? "Fully paid"
-                            : r.status === "partial"
-                              ? "Partial"
-                              : "Not paid"}
-                      </span>
-                      {r.scholarship?.coverage && (
-                        <span className="block text-[10px] text-blue-700 mt-0.5">
-                          {r.scholarship.coverage} cover
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {r.amount > 0 ? formatCurrency(r.amount) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right text-green-700">
-                      {r.amount_paid > 0
-                        ? formatCurrency(r.amount_paid)
-                        : "—"}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right font-medium ${
-                        r.balance > 0 ? "text-red-600" : "text-gray-500"
-                      }`}
-                    >
-                      {r.status === "scholarship"
-                        ? "—"
-                        : r.balance > 0
-                          ? formatCurrency(r.balance)
-                          : r.status === "paid"
-                            ? formatCurrency(0)
-                            : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">
-                      {r.parent_phone || r.parent_name || "—"}
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
+        {rows.length === 0 && (
+          <p className="p-10 text-center text-slate-400 text-sm">
+            No students match this filter
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  const map: Record<Status, string> = {
+    paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    partial: "bg-amber-50 text-amber-800 border-amber-200",
+    unpaid: "bg-rose-50 text-rose-700 border-rose-200",
+    scholarship: "bg-violet-50 text-violet-700 border-violet-200",
+    none: "bg-slate-50 text-slate-500 border-slate-200",
+  };
+  const label: Record<Status, string> = {
+    paid: "Fully paid",
+    partial: "Partial",
+    unpaid: "Not paid",
+    scholarship: "Scholarship",
+    none: "No record",
+  };
+  return (
+    <span
+      className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold border ${map[status]}`}
+    >
+      {label[status]}
+    </span>
   );
 }

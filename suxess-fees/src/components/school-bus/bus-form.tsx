@@ -30,20 +30,33 @@ export function BusForm() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("school_buses").insert({
+    const payload: Record<string, unknown> = {
       name: form.name.trim(),
       plate_number: form.plate_number || null,
       driver_name: form.driver_name || null,
       driver_phone: form.driver_phone || null,
       route_name: form.route_name || null,
-      capacity: Number(form.capacity) || 0,
-      bus_fee: parseMoneyInput(form.bus_fee) || 0,
-      notes: form.notes || null,
+      capacity: Number(form.capacity) || 30,
       is_active: true,
-    });
+    };
+    // optional columns if migration added them
+    const fee = parseMoneyInput(form.bus_fee);
+    if (fee > 0) payload.bus_fee = fee;
+    if (form.notes) payload.notes = form.notes;
+
+    let { error } = await supabase.from("school_buses").insert(payload);
+    if (error && (error.message.includes("bus_fee") || error.message.includes("notes"))) {
+      delete payload.bus_fee;
+      delete payload.notes;
+      ({ error } = await supabase.from("school_buses").insert(payload));
+    }
     setLoading(false);
     if (error) {
-      setErrorMsg(error.message);
+      setErrorMsg(
+        error.message.includes("schema") || error.message.includes("school_buses")
+          ? error.message + " — Run sql/02 in Supabase (school bus tables)."
+          : error.message
+      );
       return;
     }
     setOpen(false);
