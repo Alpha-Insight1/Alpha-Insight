@@ -108,8 +108,8 @@ export default async function StudentsPage({
           <h1 className="text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-gray-500 mt-1">
             {admin
-              ? "Manage students across all campuses"
-              : `Students at ${profile?.campuses?.short_name || "your campus"}`}
+              ? "Register and manage students"
+              : "Register and manage students"}
             <span className="text-gray-400"> · active by default</span>
           </p>
         </div>
@@ -170,40 +170,6 @@ export default async function StudentsPage({
         </div>
       )}
 
-      {admin && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Link
-            href={buildHref({})}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-              !params.campus
-                ? "bg-brand-green text-white border-brand-green"
-                : "bg-white text-gray-700 border-gray-300"
-            }`}
-          >
-            All campuses
-          </Link>
-          {(campuses || []).map((c: any) => {
-            const p = new URLSearchParams();
-            p.set("campus", c.id);
-            if (statusFilter !== "active") p.set("status", statusFilter);
-            if (classFilter) p.set("class", classFilter);
-            if (params.q) p.set("q", params.q);
-            return (
-              <Link
-                key={c.id}
-                href={`/students?${p.toString()}`}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-                  params.campus === c.id
-                    ? "bg-brand-green text-white border-brand-green"
-                    : "bg-white text-gray-700 border-gray-300"
-                }`}
-              >
-                {c.short_name || c.name}
-              </Link>
-            );
-          })}
-        </div>
-      )}
 
       <p className="text-sm text-gray-500 mb-3">
         Showing {students?.length || 0} student

@@ -64,6 +64,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
   const [existing, setExisting] = useState<ExistingStudent[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [classMode, setClassMode] = useState<"pick" | "type">("pick");
+  const [localCampuses, setLocalCampuses] = useState<CampusOption[]>(campuses);
   const defaultCampusId = campuses[0]?.id || "";
   const [form, setForm] = useState({
     campus_id: defaultCampusId,
@@ -80,14 +81,27 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
   const supabase = createClient();
 
   const selectedCampus = campuses.find((c) => c.id === form.campus_id);
-  const showExam = isTutorialCampus(selectedCampus);
+  // Alpha Insight: one school — class list, optional exam note only if needed
+  const showExam = false;
+
 
   useEffect(() => {
     if (!open) return;
-    if (!form.campus_id && campuses[0]?.id) {
-      setForm((f) => ({ ...f, campus_id: campuses[0].id }));
-    }
-  }, [open, campuses, form.campus_id]);
+    (async () => {
+      const { data } = await supabase
+        .from("campuses")
+        .select("id, name, short_name")
+        .eq("is_active", true)
+        .order("name");
+      if (data && data.length) {
+        setLocalCampuses(data as CampusOption[]);
+        setForm((f) => ({
+          ...f,
+          campus_id: f.campus_id || data[0].id,
+        }));
+      }
+    })();
+  }, [open, supabase]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,33 +132,44 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
     setLoading(true);
     setErrorMsg(null);
 
-    let campusId = form.campus_id || campuses[0]?.id || "";
+    // Single school: use selected campus, prop list, or fetch/create Main once
+    let campusId = form.campus_id || localCampuses[0]?.id || campuses[0]?.id || "";
 
-    // Single-school: create a default campus if none exist yet
     if (!campusId) {
-      const { data: created, error: campErr } = await supabase
+      const { data: existingCamp } = await supabase
         .from("campuses")
-        .insert({
-          name: "Main School",
-          short_name: "MAIN",
-          is_active: true,
-        })
-        .select("id")
-        .single();
-      if (campErr || !created) {
-        setLoading(false);
-        setErrorMsg(
-          campErr?.message ||
-            "No campus found. Add a campus in Supabase (campuses table) or try again."
-        );
-        return;
+        .select("id, name, short_name")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingCamp?.id) {
+        campusId = existingCamp.id;
+      } else {
+        const { data: created, error: campErr } = await supabase
+          .from("campuses")
+          .insert({
+            name: "Main School",
+            short_name: "MAIN",
+            is_active: true,
+          })
+          .select("id")
+          .single();
+        if (campErr || !created) {
+          setLoading(false);
+          setErrorMsg(
+            campErr?.message ||
+              "Could not set up Main campus. Run SEED-CAMPUS.sql in Supabase."
+          );
+          return;
+        }
+        campusId = created.id;
       }
-      campusId = created.id;
     }
 
     // Auto admission number per campus (e.g. MAIN-027)
     const campus =
-      campuses.find((c) => c.id === campusId) ||
+      (localCampuses.find((c) => c.id === campusId) || campuses.find((c) => c.id === campusId)) ||
       ({ id: campusId, name: "Main School", short_name: "MAIN" } as CampusOption);
     const prefix = (
       campus?.short_name ||
@@ -229,7 +254,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {campuses.length > 1 && (
+              {localCampuses.length > 1 && (
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Campus *
@@ -242,7 +267,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
                     }
                     className="w-full border rounded-lg px-3 py-2 text-sm"
                   >
-                    {campuses.map((c) => (
+                    {localCampuses.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.short_name || c.name}
                       </option>
