@@ -61,8 +61,11 @@ export default async function StudentsPage({
     .limit(1000);
   if (activeCampus) classesQuery = classesQuery.eq("campus_id", activeCampus);
 
-  const [{ data: students }, { data: campuses }, { data: classRows }] =
-    await Promise.all([query, campusesQuery, classesQuery]);
+  const [
+    { data: students, error: studentsError },
+    { data: campuses },
+    { data: classRows },
+  ] = await Promise.all([query, campusesQuery, classesQuery]);
 
   const classSet = new Set<string>();
   for (const r of classRows || []) {
@@ -95,8 +98,6 @@ export default async function StudentsPage({
 
   const statusTabs = [
     { id: "active", label: "Active" },
-    { id: "graduated", label: "Graduated" },
-    { id: "withdrawn", label: "Withdrawn" },
     { id: "inactive", label: "Inactive" },
     { id: "all", label: "All" },
   ];
@@ -118,6 +119,12 @@ export default async function StudentsPage({
           <AddStudentButton campuses={campuses || []} />
         </div>
       </div>
+
+      {studentsError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm p-3">
+          Could not load students: {studentsError.message}
+        </div>
+      )}
 
       <StudentSearch
         initialQuery={params.q || ""}

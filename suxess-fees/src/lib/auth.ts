@@ -120,8 +120,9 @@ export function isAdmin(profile: Profile | null): boolean {
 }
 
 export function campusFilter(profile: Profile | null): string | null {
-  if (!profile) return "00000000-0000-0000-0000-000000000000";
+  // Alpha Insight = one school. Only filter when a secretary is
+  // explicitly assigned a campus_id. Admin (and unassigned staff) see all.
+  if (!profile) return null;
   if (profile.role === "admin") return null;
-  if (profile.campus_id) return profile.campus_id;
-  return "00000000-0000-0000-0000-000000000000";
+  return profile.campus_id || null;
 }

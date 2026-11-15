@@ -261,7 +261,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {localCampuses.length > 1 && (
+              {localCampuses.length > 1 ? (
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Campus *
@@ -281,6 +281,13 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
                     ))}
                   </select>
                 </div>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Campus:{" "}
+                  <span className="font-medium text-slate-700">
+                    {localCampuses[0]?.name || "Main School"}
+                  </span>
+                </p>
               )}
 
               <div>
