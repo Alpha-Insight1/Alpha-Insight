@@ -22,7 +22,7 @@ type StudentOption = {
     | null;
 };
 
-type FeeType = { id: string; name: string };
+type FeeType = { id: string; name: string; default_amount?: number | null };
 
 type OutstandingFee = {
   id: string;
@@ -292,13 +292,7 @@ export function RecordPaymentForm({
       feeTypes.find((f) => f.id === feeTypeId)?.name ||
       selectedFeeTypeName ||
       "";
-    if (isExamRegistrationFeeName(examNameCheck) && !boardDeadline) {
-      alert(
-        "Exam deadline date is required so the exam can appear on Exam Register with a deadline alert."
-      );
-      setLoading(false);
-      return;
-    }
+    // Exam deadline optional (column may not exist until SQL migration)
 
     let feeId = studentFeeId;
     let feeTotal = selectedFee ? Number(selectedFee.amount || 0) : 0;
@@ -378,11 +372,6 @@ export function RecordPaymentForm({
           term: tutorial ? "Monthly" : feeTerm,
           amount: totalOwed,
           amount_paid: 0,
-          ...(isExamRegistrationFeeName(
-            feeTypes.find((f) => f.id === feeTypeId)?.name || ""
-          ) && boardDeadline
-            ? { board_deadline: boardDeadline }
-            : {}),
         })
         .select("*, fee_types(name)")
         .single();
@@ -471,19 +460,7 @@ export function RecordPaymentForm({
       selectedFeeTypeName ||
       feeTypes.find((f) => f.id === feeTypeId)?.name ||
       "";
-    if (
-      feeId &&
-      isExamRegistrationFeeName(examNameForDeadline) &&
-      boardDeadline
-    ) {
-      await supabase
-        .from("student_fees")
-        .update({
-          board_deadline: boardDeadline,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", feeId);
-    }
+    // board_deadline skipped if column not in DB (run SQL to add)
 
     const outstandingAfter = Math.max(0, feeTotal - (previousPaid + paid));
 
@@ -734,13 +711,24 @@ export function RecordPaymentForm({
                 <select
                   required={showNewFeeFields}
                   value={feeTypeId}
-                  onChange={(e) => setFeeTypeId(e.target.value)}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setFeeTypeId(id);
+                    const ft = feeTypes.find((f) => f.id === id);
+                    const def = Number(ft?.default_amount || 0);
+                    if (def > 0) {
+                      setFeeAmount(formatMoneyInput(String(Math.round(def))));
+                    }
+                  }}
                   className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-green"
                 >
                   <option value="">Select fee type</option>
                   {displayFeeTypes.map((ft) => (
                     <option key={ft.id} value={ft.id}>
                       {ft.name}
+                      {Number(ft.default_amount || 0) > 0
+                        ? ` — ₦${Number(ft.default_amount).toLocaleString("en-NG")}`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -772,11 +760,10 @@ export function RecordPaymentForm({
                 )) && (
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium mb-1 text-amber-900">
-                    Exam deadline date *
+                    Exam deadline date (optional)
                   </label>
                   <input
                     type="date"
-                    required
                     value={boardDeadline}
                     onChange={(e) => setBoardDeadline(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2.5 text-sm border-amber-400 bg-amber-50 outline-none focus:ring-2 focus:ring-amber-500"

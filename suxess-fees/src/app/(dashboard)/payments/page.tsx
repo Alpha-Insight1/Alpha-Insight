@@ -38,7 +38,7 @@ export default async function PaymentsPage({
   const [{ data: students }, { data: feeTypes }, { data: studentFees }, { data: products }] =
     await Promise.all([
       studentsQuery,
-      supabase.from("fee_types").select("id, name").order("name"),
+      supabase.from("fee_types").select("id, name, default_amount").order("name"),
       params.student
         ? supabase
             .from("student_fees")

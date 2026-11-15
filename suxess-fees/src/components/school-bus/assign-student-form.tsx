@@ -12,7 +12,7 @@ type Student = {
   class_name?: string | null;
 };
 
-type Bus = { id: string; name: string };
+type Bus = { id: string; name: string; bus_fee?: number | null };
 
 export function AssignStudentForm({
   buses,
@@ -25,6 +25,8 @@ export function AssignStudentForm({
   const [studentId, setStudentId] = useState("");
   const [search, setSearch] = useState("");
   const [pickup, setPickup] = useState("");
+  const [amountPaid, setAmountPaid] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
@@ -49,12 +51,23 @@ export function AssignStudentForm({
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("student_bus_assignments").insert({
+    const amt = Number(String(amountPaid).replace(/,/g, "")) || 0;
+    const selected = buses.find((b) => b.id === busId);
+    const payload: Record<string, unknown> = {
       bus_id: busId,
       student_id: studentId,
       pickup_point: pickup || null,
       status: "active",
-    });
+    };
+    if (amt > 0) payload.amount_paid = amt;
+    if (selected?.bus_fee != null) payload.fee_amount = selected.bus_fee;
+
+    let { error } = await supabase.from("student_bus_assignments").insert(payload);
+    if (error && (error.message.includes("amount_paid") || error.message.includes("fee_amount"))) {
+      delete payload.amount_paid;
+      delete payload.fee_amount;
+      ({ error } = await supabase.from("student_bus_assignments").insert(payload));
+    }
     setLoading(false);
     if (error) {
       setErrorMsg(
@@ -125,6 +138,24 @@ export function AssignStudentForm({
           onChange={(e) => setPickup(e.target.value)}
           className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
         />
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block">
+            Amount paid for bus (₦)
+          </label>
+          <input
+            inputMode="numeric"
+            placeholder="e.g. 15000"
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          />
+          {buses.find((b) => b.id === busId)?.bus_fee ? (
+            <p className="text-[11px] text-slate-400 mt-1">
+              Set price: ₦
+              {Number(buses.find((b) => b.id === busId)?.bus_fee).toLocaleString()}
+            </p>
+          ) : null}
+        </div>
         <button
           type="submit"
           disabled={loading || !buses.length}

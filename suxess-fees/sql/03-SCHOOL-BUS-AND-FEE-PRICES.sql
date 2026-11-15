@@ -39,3 +39,12 @@ create policy "Authenticated full access bus_assignments" on public.student_bus_
 drop policy if exists "Authenticated full access fee_types" on public.fee_types;
 create policy "Authenticated full access fee_types" on public.fee_types
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Payment / exam columns
+alter table public.student_fees add column if not exists board_deadline date;
+alter table public.student_fees add column if not exists valid_until date;
+
+-- Bus fee set by admin; amount paid when assigning
+alter table public.school_buses add column if not exists bus_fee numeric(12,2) default 0;
+alter table public.student_bus_assignments add column if not exists amount_paid numeric(12,2) default 0;
+alter table public.student_bus_assignments add column if not exists fee_amount numeric(12,2) default 0;
