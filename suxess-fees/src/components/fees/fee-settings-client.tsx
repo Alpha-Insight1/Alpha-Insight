@@ -8,6 +8,7 @@ import {
   formatMoneyInput,
   parseMoneyInput,
 } from "@/components/ui/money-input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type FeeType = {
   id: string;
@@ -23,6 +24,8 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
   const [newAmountDisplay, setNewAmountDisplay] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FeeType | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -49,7 +52,34 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
       );
       return;
     }
-    setMsg(`Saved “${name.trim()}” — secretaries will see ₦${amount.toLocaleString()}`);
+    setMsg(
+      `Saved “${name.trim()}” — secretaries will see ₦${amount.toLocaleString()}`
+    );
+    router.refresh();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setMsg(null);
+    const { error } = await supabase
+      .from("fee_types")
+      .delete()
+      .eq("id", deleteTarget.id);
+    setDeleting(false);
+    if (error) {
+      setMsg(
+        error.message.includes("foreign key") ||
+          error.message.includes("violates")
+          ? `Cannot delete “${deleteTarget.name}” — it is linked to existing student fees or payments. Deactivate it instead or clear those records first.`
+          : error.message
+      );
+      setDeleteTarget(null);
+      return;
+    }
+    setMsg(`Deleted “${deleteTarget.name}”`);
+    setDeleteTarget(null);
+    setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
     router.refresh();
   };
 
@@ -89,7 +119,8 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
             Fee catalogue
           </p>
           <p className="text-xs text-slate-400 mt-0.5">
-            Edit name and price. Secretary sees these on Record Payment.
+            Edit name and price, then Save. You can also delete a fee type.
+            Secretary sees these on Record Payment.
           </p>
         </div>
         <div className="table-wrap">
@@ -98,7 +129,7 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
               <tr className="bg-slate-50 dark:bg-white/5 text-left text-xs uppercase tracking-wider text-slate-500">
                 <th className="px-4 py-3">Fee name</th>
                 <th className="px-4 py-3">Default price (₦)</th>
-                <th className="px-4 py-3 w-24"></th>
+                <th className="px-4 py-3 w-40 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -108,6 +139,7 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
                   row={r}
                   saving={saving === r.id}
                   onSave={(name, amt) => saveRow(r.id, name, amt)}
+                  onDelete={() => setDeleteTarget(r)}
                 />
               ))}
             </tbody>
@@ -115,7 +147,8 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
         </div>
         {rows.length === 0 && (
           <p className="p-6 text-center text-slate-400 text-sm">
-            No fee types — add School Fees, NECO, JAMB, Uniform, School Bus below
+            No fee types — add School Fees, NECO, JAMB, Uniform, School Bus
+            below
           </p>
         )}
       </div>
@@ -148,6 +181,21 @@ export function FeeSettingsClient({ initial }: { initial: FeeType[] }) {
           {saving === "new" ? "Saving…" : "Add fee type"}
         </button>
       </form>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete fee type?"
+        message={
+          deleteTarget
+            ? `Delete “${deleteTarget.name}”? This removes it from the catalogue. If students already have this fee, deletion may fail — clear those records first.`
+            : ""
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -156,10 +204,12 @@ function FeeRow({
   row,
   saving,
   onSave,
+  onDelete,
 }: {
   row: FeeType;
   saving: boolean;
   onSave: (name: string, amount: number) => void;
+  onDelete: () => void;
 }) {
   const [name, setName] = useState(row.name);
   const [display, setDisplay] = useState(
@@ -190,14 +240,24 @@ function FeeRow({
         />
       </td>
       <td className="px-4 py-3">
-        <button
-          type="button"
-          disabled={saving || !name.trim()}
-          onClick={() => onSave(name, parseMoneyInput(display))}
-          className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
-        >
-          {saving ? "…" : "Save"}
-        </button>
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            disabled={saving || !name.trim()}
+            onClick={() => onSave(name, parseMoneyInput(display))}
+            className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
+          >
+            {saving ? "…" : "Save"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onDelete}
+            className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+          >
+            Delete
+          </button>
+        </div>
       </td>
     </tr>
   );

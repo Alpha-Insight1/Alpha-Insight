@@ -24,6 +24,15 @@ type StudentOption = {
 
 type FeeType = { id: string; name: string; default_amount?: number | null };
 
+type SchoolBusOption = {
+  id: string;
+  name: string;
+  route_name?: string | null;
+  bus_fee?: number | null;
+  plate_number?: string | null;
+  capacity?: number | null;
+};
+
 type OutstandingFee = {
   id: string;
   amount?: number;
@@ -93,6 +102,13 @@ function isExamRegistrationFeeName(name?: string | null): boolean {
     (n.includes("exam") &&
       (n.includes("regist") || n.includes("form") || n.includes("pin")))
   );
+}
+
+/** School bus fee — secretary assigns student to a bus/route with its price */
+function isSchoolBusFeeName(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase().trim();
+  return n.includes("school bus") || n === "bus" || n.includes("bus fee");
 }
 
 
@@ -193,6 +209,9 @@ export function RecordPaymentForm({
   const [loadingFees, setLoadingFees] = useState(false);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [buses, setBuses] = useState<SchoolBusOption[]>([]);
+  const [selectedBusId, setSelectedBusId] = useState("");
+  const [loadingBuses, setLoadingBuses] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -221,6 +240,33 @@ export function RecordPaymentForm({
     feeTypes.find((ft) => ft.id === feeTypeId)?.name ||
     selectedFee?.fee_types?.name ||
     "—";
+
+  const isBusPayment = isSchoolBusFeeName(selectedFeeTypeName);
+
+  // Load active buses when secretary selects School Bus fee
+  useEffect(() => {
+    if (!isBusPayment) {
+      setBuses([]);
+      setSelectedBusId("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingBuses(true);
+      const { data } = await supabase
+        .from("school_buses")
+        .select("id, name, route_name, bus_fee, plate_number, capacity")
+        .eq("is_active", true)
+        .order("name");
+      if (!cancelled) {
+        setBuses((data as SchoolBusOption[]) || []);
+        setLoadingBuses(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBusPayment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!studentId) {
@@ -452,6 +498,46 @@ export function RecordPaymentForm({
       "";
     // board_deadline skipped if column not in DB (run SQL to add)
 
+    // School bus: assign student to selected bus so it shows on School Bus page
+    const busFeeName =
+      feeTypeName ||
+      selectedFeeTypeName ||
+      feeTypes.find((f) => f.id === feeTypeId)?.name ||
+      "";
+    if (isSchoolBusFeeName(busFeeName) && selectedBusId && studentId) {
+      const selectedBus = buses.find((b) => b.id === selectedBusId);
+      const feeAmt = Number(selectedBus?.bus_fee || feeTotal || 0);
+      // End any previous active assignment for this student
+      await supabase
+        .from("student_bus_assignments")
+        .update({ status: "ended" })
+        .eq("student_id", studentId)
+        .eq("status", "active");
+      const assignPayload: Record<string, unknown> = {
+        student_id: studentId,
+        bus_id: selectedBusId,
+        status: "active",
+        amount_paid: paid,
+        fee_amount: feeAmt,
+      };
+      let { error: assignError } = await supabase
+        .from("student_bus_assignments")
+        .insert(assignPayload);
+      if (
+        assignError &&
+        (assignError.message.includes("amount_paid") ||
+          assignError.message.includes("fee_amount") ||
+          assignError.message.includes("status"))
+      ) {
+        delete assignPayload.amount_paid;
+        delete assignPayload.fee_amount;
+        ({ error: assignError } = await supabase
+          .from("student_bus_assignments")
+          .insert(assignPayload));
+      }
+      // Non-blocking: payment already succeeded even if assign fails
+    }
+
     const outstandingAfter = Math.max(0, feeTotal - (previousPaid + paid));
 
     setSummary({
@@ -476,6 +562,7 @@ export function RecordPaymentForm({
     setNotes("");
     setStudentFeeId("");
     setCreateNewFee(false);
+    setSelectedBusId("");
     setLoading(false);
     router.refresh();
   };
@@ -684,6 +771,47 @@ export function RecordPaymentForm({
                 School fees: use the outstanding line for the same session/term.
                 Creating a second fee for the same term is usually a mistake.
               </p>
+
+              {isBusPayment && (
+                <div className="mt-3">
+                  <label className="block text-sm font-medium mb-1 text-blue-900">
+                    Bus & route (assign student)
+                  </label>
+                  {loadingBuses ? (
+                    <p className="text-xs text-gray-500 py-1">Loading buses…</p>
+                  ) : buses.length === 0 ? (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-2">
+                      No active buses. Add buses under School bus first.
+                    </p>
+                  ) : (
+                    <select
+                      value={selectedBusId}
+                      onChange={(e) => setSelectedBusId(e.target.value)}
+                      className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
+                    >
+                      <option value="">Select bus / route (optional)</option>
+                      {buses.map((b) => {
+                        const fee = Number(b.bus_fee || 0);
+                        const route = b.route_name || "No route set";
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                            {b.plate_number ? ` (${b.plate_number})` : ""} —{" "}
+                            {route}
+                            {fee > 0
+                              ? ` — ₦${fee.toLocaleString("en-NG")}`
+                              : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  <p className="text-xs text-blue-800 mt-1">
+                    Selecting a bus assigns the student so they appear under
+                    School bus.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -704,9 +832,10 @@ export function RecordPaymentForm({
                   onChange={(e) => {
                     const id = e.target.value;
                     setFeeTypeId(id);
+                    setSelectedBusId("");
                     const ft = feeTypes.find((f) => f.id === id);
                     const def = Number(ft?.default_amount || 0);
-                    if (def > 0) {
+                    if (def > 0 && !isSchoolBusFeeName(ft?.name)) {
                       setFeeAmount(formatMoneyInput(String(Math.round(def))));
                     }
                   }}
@@ -726,6 +855,61 @@ export function RecordPaymentForm({
                   })}
                 </select>
               </div>
+
+              {isBusPayment && (
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1 text-blue-900">
+                    Bus & route *
+                  </label>
+                  {loadingBuses ? (
+                    <p className="text-xs text-gray-500 py-2">Loading buses…</p>
+                  ) : buses.length === 0 ? (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-2">
+                      No active buses. Add buses and routes under{" "}
+                      <strong>School bus</strong> first. Each route can have its
+                      own price.
+                    </p>
+                  ) : (
+                    <select
+                      required
+                      value={selectedBusId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSelectedBusId(id);
+                        const bus = buses.find((b) => b.id === id);
+                        const price = Number(bus?.bus_fee || 0);
+                        if (price > 0) {
+                          setFeeAmount(
+                            formatMoneyInput(String(Math.round(price)))
+                          );
+                        }
+                      }}
+                      className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
+                    >
+                      <option value="">Select bus / route</option>
+                      {buses.map((b) => {
+                        const fee = Number(b.bus_fee || 0);
+                        const route = b.route_name || "No route set";
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                            {b.plate_number ? ` (${b.plate_number})` : ""} —{" "}
+                            {route}
+                            {fee > 0
+                              ? ` — ₦${fee.toLocaleString("en-NG")}`
+                              : " — set fee on School bus"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  <p className="text-xs text-blue-800 mt-1">
+                    Student will be assigned to this bus. Different routes can
+                    have different prices — the fee amount fills in automatically.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Fee Amount (₦) *
@@ -737,7 +921,9 @@ export function RecordPaymentForm({
                   placeholder="e.g. 85,000"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Full amount the student is expected to pay
+                  {isBusPayment
+                    ? "Auto-filled from bus route price — you can still adjust"
+                    : "Full amount the student is expected to pay"}
                 </p>
               </div>
 

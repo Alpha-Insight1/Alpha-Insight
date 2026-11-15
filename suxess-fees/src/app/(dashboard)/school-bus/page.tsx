@@ -106,7 +106,13 @@ export default async function SchoolBusPage() {
           )}
         </div>
         <AssignStudentForm
-          buses={(buses || []).map((b: any) => ({ id: b.id, name: b.name }))}
+          buses={(buses || []).map((b: any) => ({
+            id: b.id,
+            name: b.name,
+            route_name: b.route_name,
+            bus_fee: b.bus_fee,
+            plate_number: b.plate_number,
+          }))}
           students={(students as any) || []}
         />
       </div>

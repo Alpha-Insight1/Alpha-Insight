@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MessageDialog } from "@/components/ui/confirm-dialog";
+import { formatCurrency } from "@/lib/utils";
 
 type Student = {
   id: string;
@@ -12,7 +13,13 @@ type Student = {
   class_name?: string | null;
 };
 
-type Bus = { id: string; name: string; bus_fee?: number | null };
+type Bus = {
+  id: string;
+  name: string;
+  route_name?: string | null;
+  bus_fee?: number | null;
+  plate_number?: string | null;
+};
 
 export function AssignStudentForm({
   buses,
@@ -31,6 +38,8 @@ export function AssignStudentForm({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  const selectedBus = buses.find((b) => b.id === busId);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -52,7 +61,15 @@ export function AssignStudentForm({
     }
     setLoading(true);
     const amt = Number(String(amountPaid).replace(/,/g, "")) || 0;
-    const selected = buses.find((b) => b.id === busId);
+    const feeAmt = Number(selectedBus?.bus_fee || 0);
+
+    // End previous active assignment for this student
+    await supabase
+      .from("student_bus_assignments")
+      .update({ status: "ended" })
+      .eq("student_id", studentId)
+      .eq("status", "active");
+
     const payload: Record<string, unknown> = {
       bus_id: busId,
       student_id: studentId,
@@ -60,10 +77,14 @@ export function AssignStudentForm({
       status: "active",
     };
     if (amt > 0) payload.amount_paid = amt;
-    if (selected?.bus_fee != null) payload.fee_amount = selected.bus_fee;
+    if (feeAmt > 0) payload.fee_amount = feeAmt;
 
     let { error } = await supabase.from("student_bus_assignments").insert(payload);
-    if (error && (error.message.includes("amount_paid") || error.message.includes("fee_amount"))) {
+    if (
+      error &&
+      (error.message.includes("amount_paid") ||
+        error.message.includes("fee_amount"))
+    ) {
       delete payload.amount_paid;
       delete payload.fee_amount;
       ({ error } = await supabase.from("student_bus_assignments").insert(payload));
@@ -82,6 +103,7 @@ export function AssignStudentForm({
     setStudentId("");
     setSearch("");
     setPickup("");
+    setAmountPaid("");
     router.refresh();
   };
 
@@ -99,17 +121,41 @@ export function AssignStudentForm({
             Add a bus first (top right), then assign students.
           </p>
         ) : (
-          <select
-            value={busId}
-            onChange={(e) => setBusId(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-          >
-            {buses.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">
+              Bus & route
+            </label>
+            <select
+              value={busId}
+              onChange={(e) => {
+                setBusId(e.target.value);
+                const b = buses.find((x) => x.id === e.target.value);
+                const fee = Number(b?.bus_fee || 0);
+                if (fee > 0) setAmountPaid(String(Math.round(fee)));
+              }}
+              className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+            >
+              {buses.map((b) => {
+                const fee = Number(b.bus_fee || 0);
+                const route = b.route_name || "No route";
+                return (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                    {b.plate_number ? ` (${b.plate_number})` : ""} — {route}
+                    {fee > 0 ? ` — ${formatCurrency(fee)}` : ""}
+                  </option>
+                );
+              })}
+            </select>
+            {selectedBus?.route_name && (
+              <p className="text-xs text-gray-500 mt-1">
+                Route: {selectedBus.route_name}
+                {Number(selectedBus.bus_fee || 0) > 0
+                  ? ` · Fee ${formatCurrency(Number(selectedBus.bus_fee))}`
+                  : ""}
+              </p>
+            )}
+          </div>
         )}
         <input
           type="search"
@@ -149,19 +195,16 @@ export function AssignStudentForm({
             onChange={(e) => setAmountPaid(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white"
           />
-          {buses.find((b) => b.id === busId)?.bus_fee ? (
-            <p className="text-[11px] text-slate-400 mt-1">
-              Set price: ₦
-              {Number(buses.find((b) => b.id === busId)?.bus_fee).toLocaleString()}
-            </p>
-          ) : null}
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Auto-fills from route price when available
+          </p>
         </div>
         <button
           type="submit"
-          disabled={loading || !buses.length}
-          className="w-full bg-brand-blue text-white py-2 rounded-lg text-sm font-medium disabled:opacity-60"
+          disabled={loading || buses.length === 0}
+          className="w-full py-2.5 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-navy disabled:opacity-50"
         >
-          {loading ? "Saving…" : "Assign"}
+          {loading ? "Saving…" : "Assign to bus"}
         </button>
       </form>
       <MessageDialog
