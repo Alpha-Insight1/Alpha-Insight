@@ -103,19 +103,20 @@ export function Sidebar({
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-3">
           <Image
-            src="/alpha-insight-logo.jpg"
+            src="/alpha-insight-icon.svg"
             alt="Alpha Insight"
-            width={48}
-            height={48}
-            className="rounded-xl object-contain shadow-md bg-white p-1 ring-1 ring-slate-200"
+            width={40}
+            height={40}
+            className="rounded-[10px] object-contain shadow-sm"
             priority
+            unoptimized
           />
           <div className="min-w-0">
             <p className="font-bold text-slate-800 dark:text-white text-sm tracking-tight truncate">
               Alpha Insight
             </p>
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">
-              School OS
+              Financial management
             </p>
           </div>
         </div>
@@ -186,11 +187,12 @@ export function Sidebar({
           <Menu className="w-5 h-5" />
         </button>
         <Image
-          src="/alpha-insight-logo.jpg"
+          src="/alpha-insight-icon.svg"
           alt="Alpha Insight"
           width={28}
           height={28}
-          className="rounded-lg object-contain bg-white p-0.5 border border-slate-200"
+          className="rounded-lg object-contain"
+          unoptimized
         />
         <span className="text-slate-800 font-semibold text-sm truncate">
           Alpha Insight

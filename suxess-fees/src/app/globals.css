@@ -203,3 +203,11 @@ textarea:focus {
 .table-wrap tbody td {
   @apply px-4 py-3 border-t border-slate-100 dark:border-white/5;
 }
+
+/* Login form: always readable credentials */
+.login-field,
+input.login-field {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  -webkit-text-fill-color: #0f172a !important;
+}

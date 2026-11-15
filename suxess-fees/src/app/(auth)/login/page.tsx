@@ -51,14 +51,15 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-10">
-            <div className="inline-flex rounded-2xl bg-white p-3 shadow-xl ring-2 ring-white/50">
+            <div className="inline-flex rounded-2xl bg-white/95 p-2.5 shadow-xl ring-1 ring-white/40">
               <Image
-                src="/alpha-insight-logo.jpg"
+                src="/alpha-insight-icon.svg"
                 alt="Alpha Insight"
-                width={96}
-                height={96}
-                className="rounded-xl object-contain w-24 h-24"
+                width={88}
+                height={88}
+                className="rounded-xl object-contain w-[88px] h-[88px]"
                 priority
+                unoptimized
               />
             </div>
           </div>
@@ -71,8 +72,7 @@ export default function LoginPage() {
               Alpha Insight
             </h1>
             <p className="text-blue-100 text-sm leading-relaxed max-w-xs">
-              School operations &amp; analytics for directors and secretaries —
-              clear numbers, calm interface.
+              School operations and analytics for directors and secretaries.
             </p>
           </div>
 
@@ -82,16 +82,17 @@ export default function LoginPage() {
         </div>
 
         {/* Right form */}
-        <div className="flex flex-col justify-center p-8 sm:p-10">
+        <div className="flex flex-col justify-center p-8 sm:p-10 bg-white dark:bg-slate-900">
           <div className="md:hidden flex items-center gap-3 mb-8">
-            <div className="rounded-2xl bg-white p-2 shadow-lg border border-slate-100">
+            <div className="rounded-2xl bg-white p-1.5 shadow-md border border-slate-100/80">
               <Image
-                src="/alpha-insight-logo.jpg"
+                src="/alpha-insight-icon.svg"
                 alt="Alpha Insight"
-                width={72}
-                height={72}
-                className="rounded-xl object-contain w-[72px] h-[72px]"
+                width={56}
+                height={56}
+                className="rounded-xl object-contain"
                 priority
+                unoptimized
               />
             </div>
             <div>
@@ -130,7 +131,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                  className="login-field w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
                   placeholder="director@school.com"
                 />
               </div>
@@ -148,7 +149,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-11 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
+                  className="login-field w-full pl-10 pr-11 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
                   placeholder="••••••••"
                 />
                 <button

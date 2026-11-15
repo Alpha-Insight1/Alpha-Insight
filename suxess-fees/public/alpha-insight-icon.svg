@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Alpha Insight">
+  <defs>
+    <linearGradient id="ai-bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="ai-shine" x1="20" y1="12" x2="44" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#E0E7FF" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded app tile -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#ai-bg)"/>
+  <!-- Soft inner highlight -->
+  <rect x="2" y="2" width="60" height="28" rx="16" fill="white" fill-opacity="0.12"/>
+  <!-- Abstract A / rising insight -->
+  <path d="M32 14L46 50H39.2L36.1 41.2H27.9L24.8 50H18L32 14Z" fill="url(#ai-shine)"/>
+  <path d="M29.4 36.8H34.6L32 29.2L29.4 36.8Z" fill="#4F46E5"/>
+  <!-- Spark / analytics node -->
+  <circle cx="46" cy="18" r="3.2" fill="#FDE68A"/>
+  <path d="M46 12.5V15.2M46 20.8V23.5M40.5 18H43.2M48.8 18H51.5" stroke="#FDE68A" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

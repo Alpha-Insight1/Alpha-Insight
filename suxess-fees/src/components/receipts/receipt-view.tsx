@@ -50,10 +50,11 @@ export function ReceiptView({ payment }: { payment: ReceiptPayment }) {
 
         <div className="flex items-center gap-4 mb-6">
           <Image
-            src="/alpha-insight-logo.jpg"
+            src="/alpha-insight-icon.svg"
             alt="Alpha Insight"
-            width={64}
-            height={64}
+            width={48}
+            height={48}
+            unoptimized
             className="rounded-full"
           />
           <div>

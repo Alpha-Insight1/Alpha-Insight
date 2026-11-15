@@ -84,6 +84,13 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
 
   useEffect(() => {
     if (!open) return;
+    if (!form.campus_id && campuses[0]?.id) {
+      setForm((f) => ({ ...f, campus_id: campuses[0].id }));
+    }
+  }, [open, campuses, form.campus_id]);
+
+  useEffect(() => {
+    if (!open) return;
     (async () => {
       const { data } = await supabase
         .from("students")
@@ -104,14 +111,41 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.campus_id || !form.full_name.trim()) {
-      alert("Campus and student name are required.");
+    if (!form.full_name.trim()) {
+      setErrorMsg("Student name is required.");
       return;
     }
     setLoading(true);
+    setErrorMsg(null);
+
+    let campusId = form.campus_id || campuses[0]?.id || "";
+
+    // Single-school: create a default campus if none exist yet
+    if (!campusId) {
+      const { data: created, error: campErr } = await supabase
+        .from("campuses")
+        .insert({
+          name: "Main School",
+          short_name: "MAIN",
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (campErr || !created) {
+        setLoading(false);
+        setErrorMsg(
+          campErr?.message ||
+            "No campus found. Add a campus in Supabase (campuses table) or try again."
+        );
+        return;
+      }
+      campusId = created.id;
+    }
 
     // Auto admission number per campus (e.g. MAIN-027)
-    const campus = campuses.find((c) => c.id === form.campus_id);
+    const campus =
+      campuses.find((c) => c.id === campusId) ||
+      ({ id: campusId, name: "Main School", short_name: "MAIN" } as CampusOption);
     const prefix = (
       campus?.short_name ||
       campus?.name?.replace(/\s+/g, "").slice(0, 8) ||
@@ -124,7 +158,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
     const { data: existingNums } = await supabase
       .from("students")
       .select("admission_number")
-      .eq("campus_id", form.campus_id)
+      .eq("campus_id", campusId)
       .ilike("admission_number", `${prefix}-%`);
 
     let maxN = 0;
@@ -135,7 +169,7 @@ export function AddStudentButton({ campuses }: { campuses: CampusOption[] }) {
     const admission_number = `${prefix}-${String(maxN + 1).padStart(3, "0")}`;
 
     const payload: any = {
-      campus_id: form.campus_id,
+      campus_id: campusId,
       admission_number,
       full_name: form.full_name.trim(),
       class_name: form.class_name || (showExam ? "Tutorial" : "—"),
